@@ -22,9 +22,16 @@ MATCHING_CONFIGURATION_FILE = "config/search_config.yaml"
 
 def setup_arguments():
     parser = argparse.ArgumentParser("main")
-    parser.add_argument("filename", help="The name of the pdf containing the task description. Make sure that it does not contain the extension", type=str)
+    parser.add_argument("filename", help="The pdf containing the task description. Can be a bare name (e.g. 'Scrum'), a name with extension, or a relative/absolute path.", type=str)
     args = parser.parse_args()
     return args
+
+def resolve_pdf_path(filename: str, documents_dir: str = "documents") -> str:
+    candidates = [filename, f"{filename}.pdf", os.path.join(documents_dir, filename), os.path.join(documents_dir, f"{filename}.pdf")]
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    raise FileNotFoundError(f"Could not find a PDF for '{filename}'. Tried: {candidates}")
 
 def linear_combination(average_skills_ratings, skills_weight, average_mission_ratings, mission_weight):
     filler_mission_value = np.mean(list(average_mission_ratings.values()))
@@ -39,12 +46,10 @@ if __name__ == "__main__":
     with open(MATCHING_CONFIGURATION_FILE, 'r') as f:
         matching_configuration = yaml.safe_load(f)
 
-    # print("Generating task requirements...")
-    # model_response = get_model_response(args.filename+".pdf", matching_configuration["model"]["name"])
-    # task_description = generate_yaml(model_response, think=matching_configuration["model"]["think"])
-
-    with open(f"output/filtered_skills/{args.filename}.yaml", 'r') as f:
-        task_requirements = yaml.safe_load(f)
+    print("Generating task requirements...")
+    pdf_path = resolve_pdf_path(args.filename)
+    model_response = get_model_response(pdf_path, matching_configuration["model"]["name"])
+    task_requirements = generate_yaml(model_response, think=matching_configuration["model"]["think"])
     
     model = SentenceTransformer(matching_configuration["embedding_model"])
     
